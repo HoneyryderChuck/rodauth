@@ -35,6 +35,7 @@ module Rodauth
     auth_value_method :unlock_account_email_subject, 'Unlock Account'
     auth_value_method :unlock_account_key_param, 'key'
     auth_value_method :unlock_account_requires_password?, false
+    auth_value_method :unlock_account_session_key, :unlock_account_key
 
     auth_value_methods(
       :unlock_account_redirect,
@@ -69,6 +70,7 @@ module Rodauth
 
           set_notice_flash unlock_account_request_notice_flash
         else
+          set_redirect_error_status(no_matching_login_error_status)
           set_redirect_error_flash no_matching_login_message
         end
 
@@ -81,17 +83,26 @@ module Rodauth
       before_unlock_account_route
 
       r.get do
-        if account_from_unlock_key(param(unlock_account_key_param))
-          unlock_account_view
-        else
-          set_redirect_error_flash no_matching_unlock_account_key_message
-          redirect require_login_redirect
+        if key = param_or_nil(unlock_account_key_param)
+          session[unlock_account_session_key] = key
+          redirect(r.path)
+        end
+
+        if key = session[unlock_account_session_key]
+          if account_from_unlock_key(key)
+            unlock_account_view
+          else
+            session[unlock_account_session_key] = nil
+            set_redirect_error_flash no_matching_unlock_account_key_message
+            redirect require_login_redirect
+          end
         end
       end
 
       r.post do
-        key = param(unlock_account_key_param)
+        key = session[unlock_account_session_key] || param(unlock_account_key_param)
         unless account_from_unlock_key(key)
+          set_redirect_error_status invalid_key_error_status
           set_redirect_error_flash no_matching_unlock_account_key_message
           redirect unlock_account_request_redirect
         end
@@ -106,9 +117,11 @@ module Rodauth
             end
           end
 
+          session[unlock_account_session_key] = nil
           set_notice_flash unlock_account_notice_flash
           redirect unlock_account_redirect
         else
+          set_response_error_status(invalid_password_error_status)
           set_field_error(password_param, invalid_password_message)
           set_error_flash unlock_account_error_flash
           unlock_account_view
@@ -230,6 +243,7 @@ module Rodauth
     end
 
     def show_lockout_page
+      set_response_error_status lockout_error_status
       set_error_flash login_lockout_error_flash
       response.write unlock_account_request_view
       request.halt

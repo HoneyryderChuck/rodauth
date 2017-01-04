@@ -1,5 +1,12 @@
 $: << 'lib'
 
+if ENV['WARNING']
+  require 'warning'
+  Warning.ignore([:missing_ivar, :missing_gvar, :fixnum])
+  #Warning.ignore(/warning: URI\.escape is obsolete\n\z/)
+  Warning.ignore(:method_redefined, File.dirname(File.dirname(__FILE__)))
+end
+
 if ENV['COVERAGE']
   require 'coverage'
   require 'simplecov'
@@ -34,7 +41,8 @@ require 'logger'
 require 'tilt/string'
 
 db_url = ENV['RODAUTH_SPEC_DB'] || 'postgres:///?user=rodauth_test&password=rodauth_test'
-DB = Sequel.connect(db_url)
+DB = Sequel.connect(db_url, :identifier_mangling=>false)
+DB.extension(:freeze_datasets)
 puts "using #{DB.database_type}"
 
 #DB.loggers << Logger.new($stdout)
@@ -103,6 +111,7 @@ class Minitest::HooksSpec
         enable :jwt
         jwt_secret '1'
         json_response_success_key 'success'
+        json_response_custom_error_status? true
       end
       instance_exec(&rodauth_block)
     end

@@ -1,7 +1,6 @@
 #!/usr/bin/env/ruby
 require 'roda'
-require 'erubis'
-require 'tilt/erubis'
+require 'tilt/erubi'
 require 'sequel/core'
 require 'mail'
 require 'securerandom'
@@ -9,12 +8,13 @@ require 'securerandom'
 module RodauthDemo
 class App < Roda
   if url = ENV['RODAUTH_DATABASE_URL'] || ENV['DATABASE_URL'] 
-    DB = Sequel.connect(url)
+    DB = Sequel.connect(url, :identifier_mangling=>false)
   else
-    DB = Sequel.sqlite
+    DB = Sequel.sqlite(:identifier_mangling=>false)
     Sequel.extension :migration
     Sequel::Migrator.run(DB, File.expand_path('../../spec/migrate_travis', __FILE__))
   end
+  DB.extension(:freeze_datasets)
 
   ::Mail.defaults do
     delivery_method :test
@@ -28,7 +28,7 @@ class App < Roda
 
   secret = ENV['RODAUTH_SESSION_SECRET'] || ENV['SESSION_SECRET'] || SecureRandom.random_bytes(30)
   use Rack::Session::Cookie, :secret=>secret, :key => '_rodauth_demo_session'
-  plugin :render, :escape=>true, :check_paths=>true
+  plugin :render, :escape=>:erubi, :check_paths=>true
   plugin :hooks
 
   plugin :csrf, :skip_if => lambda{|req| req.env['CONTENT_TYPE'] =~ /application\/json/}

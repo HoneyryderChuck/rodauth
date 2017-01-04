@@ -29,6 +29,7 @@ module Rodauth
     auth_value_method :reset_password_table, :account_password_reset_keys
     auth_value_method :reset_password_id_column, :id
     auth_value_method :reset_password_key_column, :key
+    auth_value_method :reset_password_session_key, :reset_password_key
 
     auth_value_methods :reset_password_email_sent_redirect
 
@@ -63,6 +64,7 @@ module Rodauth
 
           set_notice_flash reset_password_email_sent_notice_flash
         else
+          set_redirect_error_status(no_matching_login_error_status)
           set_redirect_error_flash reset_password_request_error_flash
         end
 
@@ -76,9 +78,15 @@ module Rodauth
 
       r.get do
         if key = param_or_nil(reset_password_key_param)
+          session[reset_password_session_key] = key
+          redirect(r.path)
+        end
+
+        if key = session[reset_password_session_key]
           if account_from_reset_password_key(key)
             reset_password_view
           else
+            session[reset_password_session_key] = nil
             set_redirect_error_flash no_matching_reset_password_key_message
             redirect require_login_redirect
           end
@@ -86,8 +94,9 @@ module Rodauth
       end
 
       r.post do
-        key = param(reset_password_key_param)
+        key = session[reset_password_session_key] || param(reset_password_key_param)
         unless account_from_reset_password_key(key)
+          set_redirect_error_status(invalid_key_error_status)
           set_redirect_error_flash reset_password_error_flash
           redirect reset_password_email_sent_redirect
         end
@@ -95,15 +104,15 @@ module Rodauth
         password = param(password_param)
         catch_error do
           if password_match?(password) 
-            throw_error(password_param, same_as_existing_password_message)
+            throw_error_status(invalid_field_error_status, password_param, same_as_existing_password_message)
           end
 
           if require_password_confirmation? && password != param(password_confirm_param)
-            throw_error(password_param, passwords_do_not_match_message)
+            throw_error_status(unmatched_field_error_status, password_param, passwords_do_not_match_message)
           end
 
           unless password_meets_requirements?(password)
-            throw_error(password_param, password_does_not_meet_requirements_message)
+            throw_error_status(invalid_field_error_status, password_param, password_does_not_meet_requirements_message)
           end
 
           transaction do
@@ -117,6 +126,7 @@ module Rodauth
             update_session
           end
 
+          session[reset_password_session_key] = nil
           set_notice_flash reset_password_notice_flash
           redirect reset_password_redirect
         end

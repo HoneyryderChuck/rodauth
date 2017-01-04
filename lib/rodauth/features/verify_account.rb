@@ -30,6 +30,7 @@ module Rodauth
     auth_value_method :verify_account_table, :account_verification_keys
     auth_value_method :verify_account_id_column, :id
     auth_value_method :verify_account_key_column, :key
+    auth_value_method :verify_account_session_key, :verify_account_key
 
     auth_value_methods :verify_account_key_value
 
@@ -63,6 +64,7 @@ module Rodauth
 
           set_notice_flash verify_account_email_sent_notice_flash
         else
+          set_redirect_error_status(no_matching_login_error_status)
           set_redirect_error_flash verify_account_resend_error_flash
         end
         
@@ -76,9 +78,15 @@ module Rodauth
 
       r.get do
         if key = param_or_nil(verify_account_key_param)
+          session[verify_account_session_key] = key
+          redirect(r.path)
+        end
+
+        if key = session[verify_account_session_key]
           if account_from_verify_account_key(key)
             verify_account_view
           else
+            session[verify_account_session_key] = nil
             set_redirect_error_flash no_matching_verify_account_key_message
             redirect require_login_redirect
           end
@@ -86,8 +94,9 @@ module Rodauth
       end
 
       r.post do
-        key = param(verify_account_key_param)
+        key = session[verify_account_session_key] || param(verify_account_key_param)
         unless account_from_verify_account_key(key)
+          set_redirect_error_status(invalid_key_error_status)
           set_redirect_error_flash verify_account_error_flash
           redirect verify_account_redirect
         end
@@ -103,6 +112,7 @@ module Rodauth
           update_session
         end
 
+        session[verify_account_session_key] = nil
         set_notice_flash verify_account_notice_flash
         redirect verify_account_redirect
       end
@@ -129,6 +139,7 @@ module Rodauth
 
     def new_account(login)
       if account_from_login(login)
+        set_redirect_error_status(unopen_account_error_status)
         set_error_flash attempt_to_create_unverified_account_notice_message
         response.write resend_verify_account_view
         request.halt
@@ -170,6 +181,7 @@ module Rodauth
 
     def before_login_attempt
       unless open_account?
+        set_redirect_error_status(unopen_account_error_status)
         set_error_flash attempt_to_login_to_unverified_account_notice_message
         response.write resend_verify_account_view
         request.halt

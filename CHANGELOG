@@ -1,5 +1,15 @@
 === HEAD
 
+* Add json_response_custom_error_status? option to jwt feature to use specific 4xx statuses instead of 400 (jeremyevans)
+
+* Use 4xx error statuses for errors, instead of using a 200 success status (jeremyevans)
+
+=== 1.7.0 (2016-11-22)
+
+* Make reset password, unlock account, and verify account pages not leak keys to external servers via Referer header (jeremyevans)
+
+=== 1.6.0 (2016-10-24)
+
 * Add http_basic_auth feature (TiagoCardoso1983, jeremyevans) (#12)
 
 * Move login hooks from login feature to base, to be usable by other features (jeremyevans)
@@ -8,7 +18,7 @@
 
 * Memoize jwt_payload in jwt feature, as it may be called more than once (mwpastore) (#10)
 
-* Add jwt_decode_options configuration method to jwt feature, for specifying options to JWT.decode, allowing for JWT claim verification (mwpastore, jeremyevans) (#9)
+* Add jwt_decode_opts configuration method to jwt feature, for specifying options to JWT.decode, allowing for JWT claim verification (mwpastore, jeremyevans) (#9)
 
 * Add jwt_session_hash configuration method to jwt feature, for modifying the session information stored in the JWT hash, allowing for setting JWT claims (mwpastore, jeremyevans) (#9)
 
